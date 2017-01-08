@@ -1,138 +1,100 @@
 package com.example.bogdan.movieoftheweek;
 
-import android.app.ProgressDialog;
-import android.content.DialogInterface;
-import android.os.AsyncTask;
-import android.support.v7.app.AppCompatActivity;
+import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
-import android.util.Pair;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.ImageRequest;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.Volley;
 
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
-
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.List;
 
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
 
     private final String apiKey = "be9f344b2209aa8b56138a71d6393c6d";
+    private final String imageUrl = "https://image.tmdb.org/t/p/w185";
+    private List<String> list = new ArrayList<String>();
+    //private ArrayAdapter<String> adapter;
+    private List<String> imagesUrls = new ArrayList<String>();
+
+    private List<Movie> movieList = new ArrayList<Movie>();
+    private CustomListAdapter adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        new RetrieveMovieList().execute();
-        //Toast.makeText(, response.body().toString(), Toast.LENGTH_LONG);
+        final ListView listView = (ListView)findViewById(R.id.list);
+        adapter = new CustomListAdapter(this, movieList);
+        listView.setAdapter(adapter);
+
+        JsonObjectRequest movieReq = new JsonObjectRequest(Request.Method.GET, "https://api.themoviedb.org/3/movie/now_playing?api_key=be9f344b2209aa8b56138a71d6393c6d&language=en-US&page=1"
+        , null, new Response.Listener<JSONObject>(){
+            @Override
+            public void onResponse(JSONObject response)
+            {
+
+                try {
+                    JSONArray array = response.getJSONArray("results");
+                    for(int i=0;i<array.length();i++) {
+                        JSONObject obj = array.getJSONObject(i);
+                        Movie movie = new Movie();
+                        movie.setTitle(obj.getString("original_title"));
+                        movie.setThumbnailUrl(imageUrl + obj.getString("poster_path"));
+                        movie.setId(obj.getString("id"));
+                        movieList.add(movie);
+                        //list.add(array.getJSONObject(i).getString("original_title"));
+                        //imagesUrls.add(imageUrl + array.getJSONObject(i).getString("poster_path"));
+                    }
+
+
+                    //adapter = new ArrayAdapter<String>(getApplicationContext(), R.layout.simple_list_item_1, list);
+
+
+                } catch (JSONException e) {
+
+                    e.printStackTrace();
+
+                }
+            }
+        }, new Response.ErrorListener(){
+            @Override
+            public void onErrorResponse(VolleyError error) {
+
+            }
+        });
+        AppController.getInstance().addToRequestQueue(movieReq);
+
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                //Toast.makeText(getApplicationContext(), "You clicked a movie", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(getApplicationContext(), MovieActivity.class);
+
+                intent.putExtra("id", movieList.get(position).getId());
+                intent.putExtra("image_url", movieList.get(position).getThumbnailUrl());
+
+                startActivity(intent);
+            }
+        });
+
     }
-
-
-    public class RetrieveMovieList extends AsyncTask<String, Void, String> {
-
-        private ProgressDialog progressDialog = new ProgressDialog(MainActivity.this);
-        InputStream inputStream = null;
-        String result = "";
-
-        protected void onPreExecute() {
-            progressDialog.setMessage("Downloading your data...");
-            progressDialog.show();
-            progressDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                public void onCancel(DialogInterface arg0) {
-                    RetrieveMovieList.this.cancel(true);
-                }
-            });
-        }
-
-        @Override
-        protected void doInBackground(String... params) {
-
-            String url_select = "http://yoururlhere.com";
-
-            ArrayList<Pair<String, String>> param = new ArrayList<Pair<String, String>>();
-
-            try {
-                // Set up HTTP post
-
-                // HttpClient is more then less deprecated. Need to change to URLConnection
-
-                URL url = new URL("http://some-server");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                //conn.getContent();
-                //HttpClient httpClient = new DefaultHttpClient();
-
-                //HttpPost httpPost = new HttpPost(url_select);
-                //httpPost.setEntity(new UrlEncodedFormEntity(param));
-                //HttpResponse httpResponse = httpClient.execute(httpPost);
-                //HttpEntity httpEntity = httpResponse.getEntity();
-
-                // Read content & Log
-                //inputStream = httpEntity.getContent();
-                inputStream = new ByteArrayInputStream(conn.getContent());
-            } catch (UnsupportedEncodingException e1) {
-                Log.e("UnsupportedEncodingException", e1.toString());
-                e1.printStackTrace();
-            } catch (ClientProtocolException e2) {
-                Log.e("ClientProtocolException", e2.toString());
-                e2.printStackTrace();
-            } catch (IllegalStateException e3) {
-                Log.e("IllegalStateException", e3.toString());
-                e3.printStackTrace();
-            } catch (IOException e4) {
-                Log.e("IOException", e4.toString());
-                e4.printStackTrace();
-            }
-            // Convert response to string using String Builder
-            try {
-                BufferedReader bReader = new BufferedReader(new InputStreamReader(inputStream, "utf-8"), 8);
-                StringBuilder sBuilder = new StringBuilder();
-
-                String line = null;
-                while ((line = bReader.readLine()) != null) {
-                    sBuilder.append(line + "\n");
-                }
-
-                inputStream.close();
-                result = sBuilder.toString();
-
-            } catch (Exception e) {
-                Log.e("StringBuilding & BufferedReader", "Error converting result " + e.toString());
-            }
-        } // protected Void doInBackground(String... params)
-
-        protected void onPostExecute(Void v) {
-            //parse JSON data
-            try {
-                JSONArray jArray = new JSONArray(result);
-                for(i=0; i < jArray.length(); i++) {
-
-                    JSONObject jObject = jArray.getJSONObject(i);
-
-                    String name = jObject.getString("name");
-                    String tab1_text = jObject.getString("tab1_text");
-                    int active = jObject.getInt("active");
-
-                } // End Loop
-                this.progressDialog.dismiss();
-            } catch (JSONException e) {
-                Log.e("JSONException", "Error: " + e.toString());
-            } // catch (JSONException e)
-        } // protected void onPostExecute(Void v)
-    } //class MyAsyncTask extends AsyncTask<String, String, Void>
 }
